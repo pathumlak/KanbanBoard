@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban Board</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .board {
+            display: flex;
+            justify-content: space-around;
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .column {
+            flex: 1;
+            margin: 0 15px;
+            padding: 15px;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .column-header {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 20px;
+            color: #007bff;
+        }
+
+        .card {
+            background-color: #fff;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .delete-icon {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            cursor: pointer;
+            color: #ff0000;
+            font-size: 16px;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .progress {
+            height: 100%;
+            background-color: #007bff;
+            border-radius: 5px;
+            width: 0%;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<div class="board">
+    <div class="column" id="todo" ondrop="drop(event, 'todo')" ondragover="allowDrop(event)">
+        <div class="column-header">To Do</div>
+        <div class="progress-bar">
+            <div class="progress" id="todoProgress">0%</div>
+        </div>
+    </div>
+    <div class="column" id="in-progress" ondrop="drop(event, 'in-progress')" ondragover="allowDrop(event)">
+        <div class="column-header">In Progress</div>
+        <div class="progress-bar">
+            <div class="progress" id="inProgress">0%</div>
+        </div>
+    </div>
+    <div class="column" id="done" ondrop="drop(event, 'done')" ondragover="allowDrop(event)">
+        <div class="column-header">Done</div>
+        <div class="progress-bar">
+            <div class="progress" id="doneProgress">0%</div>
+        </div>
+    </div>
+</div>
+
+<div style="margin-top: 20px;">
+    <input type="text" id="taskInput" placeholder="Add Task">
+    <button onclick="addTask()">Add Task</button>
+</div>
+
+<script>
+    let todoTasks = [];
+    let inProgressTasks = [];
+    let doneTasks = [];
+
+    function loadTasks() {
+        todoTasks = JSON.parse(localStorage.getItem('todoTasks')) || [];
+        inProgressTasks = JSON.parse(localStorage.getItem('inProgressTasks')) || [];
+        doneTasks = JSON.parse(localStorage.getItem('doneTasks')) || [];
+
+        todoTasks.forEach(task => {
+            addCard('todo', task);
+        });
+        inProgressTasks.forEach(task => {
+            addCard('in-progress', task);
+        });
+        doneTasks.forEach(task => {
+            addCard('done', task);
+        });
+
+        updateProgress();
+    }
+
+    function saveTasks() {
+        localStorage.setItem('todoTasks', JSON.stringify(todoTasks));
+        localStorage.setItem('inProgressTasks', JSON.stringify(inProgressTasks));
+        localStorage.setItem('doneTasks', JSON.stringify(doneTasks));
+    }
+
+    function allowDrop(event) {
+        event.preventDefault();
+    }
+
+    function drag(event) {
+        event.dataTransfer.setData("text", event.target.id);
+    }
+
+    function drop(event, targetColumn) {
+        event.preventDefault();
+        var data = event.dataTransfer.getData("text");
+        var target = event.target.closest('.column');
+        
+        if (target.id === targetColumn) {
+            removeTaskFromOtherColumns(data);
+
+            if (targetColumn === 'todo') {
+                todoTasks.push(data);
+            } else if (targetColumn === 'in-progress') {
+                inProgressTasks.push(data);
+            } else if (targetColumn === 'done') {
+                doneTasks.push(data);
+            }
+
+            event.target.appendChild(document.getElementById(data));
+            saveTasks();
+            updateProgress();
+        }
+    }
+
+    function removeTaskFromOtherColumns(taskId) {
+        todoTasks = todoTasks.filter(task => task !== taskId);
+        inProgressTasks = inProgressTasks.filter(task => task !== taskId);
+        doneTasks = doneTasks.filter(task => task !== taskId);
+    }
+
+    function addTask() {
+        var inputValue = document.getElementById('taskInput').value.trim();
+        
+        if (inputValue === '') {
+            alert('Please enter a task.');
+            return;
+        }
+
+        addCard('todo', inputValue);
+        todoTasks.push(inputValue.replace(/\s+/g, '-').toLowerCase());
+        saveTasks();
+        document.getElementById('taskInput').value = '';
+        updateProgress();
+    }
+
+    function addCard(columnId, task) {
+        var newCard = document.createElement('div');
+        newCard.className = 'card';
+        newCard.draggable = true;
+        newCard.ondragstart = drag;
+        newCard.id = task.replace(/\s+/g, '-').toLowerCase();
+        newCard.innerText = task;
+
+        var deleteIcon = document.createElement('span');
+        deleteIcon.className = 'delete-icon';
+        deleteIcon.innerHTML = '&#10006;'; // '×' symbol
+        deleteIcon.onclick = function() { deleteTask(columnId, newCard.id); };
+
+        newCard.appendChild(deleteIcon);
+
+        var column = document.getElementById(columnId);
+        column.insertBefore(newCard, column.childNodes[column.childNodes.length - 3]);
+    }
+
+    function deleteTask(columnId, taskId) {
+        if (columnId === 'todo') {
+            todoTasks = todoTasks.filter(task => task !== taskId);
+        } else if (columnId === 'in-progress') {
+            inProgressTasks = inProgressTasks.filter(task => task !== taskId);
+        } else if (columnId === 'done') {
+            doneTasks = doneTasks.filter(task => task !== taskId);
+        }
+
+        document.getElementById(taskId).remove();
+        saveTasks();
+        updateProgress();
+    }
+
+    function updateProgress() {
+        var totalTasks = todoTasks.length + inProgressTasks.length + doneTasks.length;
+        var todoProgress = ((todoTasks.length / totalTasks) * 100 || 0).toFixed(2) + '%';
+        var inProgressProgress = ((inProgressTasks.length / totalTasks) * 100 || 0).toFixed(2) + '%';
+        var doneProgress = ((doneTasks.length / totalTasks) * 100 || 0).toFixed(2) + '%';
+
+        document.getElementById('todoProgress').style.width = todoProgress;
+        document.getElementById('todoProgress').innerText = todoProgress;
+        document.getElementById('inProgress').style.width = inProgressProgress;
+        document.getElementById('inProgress').innerText = inProgressProgress;
+        document.getElementById('doneProgress').style.width = doneProgress;
+        document.getElementById('doneProgress').innerText = doneProgress;
+    }
+
+    loadTasks();
+</script>
+
+</body>
+</html>
